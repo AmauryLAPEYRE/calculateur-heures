@@ -1,28 +1,17 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
+// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
   base: '/calculateur-heures/',
-  assetsInclude: ['**/*.xlsx'],
-  server: {
-    fs: {
-      // Permettre l'accès aux fichiers en dehors du répertoire racine
-      allow: ['..'],
-    },
-  },
   build: {
-    // Configuration pour gérer les fichiers Excel dans le build
-    rollupOptions: {
-      output: {
-        assetFileNames: 'assets/[name][extname]',
-      },
-    },
+    outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: true
   },
-  // Résolution des chemins
-  resolve: {
-    alias: {
-      '@': '/src',
-    },
-  },
-});
+  server: {
+    port: 3000,
+    host: true
+  }
+})
