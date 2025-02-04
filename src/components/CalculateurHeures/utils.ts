@@ -8,12 +8,10 @@ export const getWeekNumber = (dateStr: string): number => {
 
   const firstThursday = new Date(target.getFullYear(), 0, 1);
   if (firstThursday.getDay() !== 4) {
-    firstThursday.setMonth(0, 1 + ((4 - firstThursday.getDay() + 7) % 7));
+    firstThursday.setMonth(0, 1 + ((4 - firstThursday.getDay()) + 7) % 7);
   }
 
-  const weekNumber =
-    1 + Math.ceil((target - firstThursday) / (7 * 24 * 60 * 60 * 1000));
-  return weekNumber;
+  return 1 + Math.ceil((target.getTime() - firstThursday.getTime()) / (7 * 24 * 60 * 60 * 1000));
 };
 
 export const calculerDuree = (debut: string, fin: string): number => {
@@ -22,7 +20,6 @@ export const calculerDuree = (debut: string, fin: string): number => {
   const [heuresDebut, minutesDebut] = debut.split(':').map(Number);
   const [heuresFin, minutesFin] = fin.split(':').map(Number);
 
-  const dureeMinutes =
-    heuresFin * 60 + minutesFin - (heuresDebut * 60 + minutesDebut);
+  const dureeMinutes: number = (heuresFin * 60 + minutesFin) - (heuresDebut * 60 + minutesDebut);
   return Math.round((dureeMinutes / 60) * 100) / 100;
 };
