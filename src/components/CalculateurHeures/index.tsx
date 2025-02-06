@@ -5,26 +5,12 @@ import { calculateDayTotal, validateDayTimes } from './timeUtils';
 import { exportToExcel } from './excelExport';
 
 const defaultHeuresJour: HeuresJour = {
-  debut: '',
-  fin: '',
-  debutAM: '',
-  finAM: '',
-  total: 0,
+  debut: '07:00',
+  fin: '12:00',
+  debutAM: '13:00',
+  finAM: '17:00',
+  total: 9,
   typeAbsence: null
-};
-
-const defaultResultats: Resultats = {
-  totalReel: 0,
-  heuresEffectives: 0,
-  heuresRegulieresNormales: 0,
-  heuresDiverses: 0,
-  heuresSupp25: 0,
-  heuresSupp50: 0,
-  seuil: 35,
-  totalFinal: 0,
-  joursPaies: 0,
-  joursExclus: 0,
-  detailCalculSeuil: ''
 };
 
 const defaultJourSemaine: JourSemaine = {
@@ -33,6 +19,20 @@ const defaultJourSemaine: JourSemaine = {
   mercredi: { ...defaultHeuresJour },
   jeudi: { ...defaultHeuresJour },
   vendredi: { ...defaultHeuresJour }
+};
+
+const defaultResultats: Resultats = {
+  totalReel: 35,
+  heuresEffectives: 35,
+  heuresRegulieresNormales: 35,
+  heuresDiverses: 0,
+  heuresSupp25: 0,
+  heuresSupp50: 0,
+  seuil: 35,
+  totalFinal: 0,
+  joursPaies: 0,
+  joursExclus: 0,
+  detailCalculSeuil: ''
 };
 
 const CalculateurHeures: React.FC = () => {
@@ -74,6 +74,9 @@ const CalculateurHeures: React.FC = () => {
           total: 0,
           typeAbsence: valeur as 'CP' | 'RTT' | 'MALADIE'
         };
+      } else if (champ === 'typeAbsence' && !valeur) {
+        // Si on retire l'absence, remettre les horaires par défaut
+        semaine.heures[jour] = { ...defaultHeuresJour };
       } else {
         semaine.heures[jour] = {
           ...semaine.heures[jour],
@@ -83,24 +86,20 @@ const CalculateurHeures: React.FC = () => {
 
         const { debut, fin, debutAM, finAM } = semaine.heures[jour];
         
-        // Valider le format et calculer le total si nécessaire
-        if (champ === 'debut' || champ === 'fin' || champ === 'debutAM' || champ === 'finAM') {
-          if (debut && fin && debutAM && finAM) {
-            const validation = validateDayTimes(debut, fin, debutAM, finAM);
-            
-            if (!validation.isValid) {
-              setErrors(prev => ({
-                ...prev,
-                [`${semaineIndex}-${jour}`]: validation.errors
-              }));
-            } else {
-              semaine.heures[jour].total = calculateDayTotal(debut, fin, debutAM, finAM);
-            }
+        if (debut && fin && debutAM && finAM) {
+          const validation = validateDayTimes(debut, fin, debutAM, finAM);
+          
+          if (!validation.isValid) {
+            setErrors(prev => ({
+              ...prev,
+              [`${semaineIndex}-${jour}`]: validation.errors
+            }));
+          } else {
+            semaine.heures[jour].total = calculateDayTotal(debut, fin, debutAM, finAM);
           }
         }
       }
 
-      // Recalculer les résultats de la semaine
       semaine.resultats = calculerSemaine(semaine.heures);
       newSemaines[semaineIndex] = semaine;
       return newSemaines;
@@ -114,14 +113,6 @@ const CalculateurHeures: React.FC = () => {
       ...prev,
       [field]: e.target.value
     }));
-  };
-
-  const handleDateChange = (semaineIndex: number, value: string) => {
-    setSemaines(prev => {
-      const newSemaines = [...prev];
-      newSemaines[semaineIndex].dates = value;
-      return newSemaines;
-    });
   };
 
   const ajouterSemaine = () => {
@@ -214,9 +205,13 @@ const CalculateurHeures: React.FC = () => {
               <input
                 type="text"
                 value={semaine.dates}
-                onChange={(e) => handleDateChange(semaineIndex, e.target.value)}
+                onChange={(e) => {
+                  const newSemaines = [...semaines];
+                  newSemaines[semaineIndex].dates = e.target.value;
+                  setSemaines(newSemaines);
+                }}
                 placeholder="Dates de la semaine (ex: 01/01 au 05/01)"
-                className="border rounded p-2"
+                className="border rounded p-2 w-64"
               />
               
               <button
@@ -233,10 +228,19 @@ const CalculateurHeures: React.FC = () => {
               <thead>
                 <tr className="bg-gray-50">
                   <th className="border p-2">Jour</th>
-                  <th className="border p-2">Matin</th>
-                  <th className="border p-2">Après-midi</th>
+                  <th className="border p-2" colSpan={2}>Matin</th>
+                  <th className="border p-2" colSpan={2}>Après-midi</th>
                   <th className="border p-2">Type Absence</th>
                   <th className="border p-2">Total</th>
+                </tr>
+                <tr className="bg-gray-50">
+                  <th className="border p-2"></th>
+                  <th className="border p-2">Début</th>
+                  <th className="border p-2">Fin</th>
+                  <th className="border p-2">Début</th>
+                  <th className="border p-2">Fin</th>
+                  <th className="border p-2"></th>
+                  <th className="border p-2"></th>
                 </tr>
               </thead>
               <tbody>
@@ -245,80 +249,82 @@ const CalculateurHeures: React.FC = () => {
                     <td className="border p-2 font-medium capitalize">{jour}</td>
                     <td className="border p-2">
                       {!heures.typeAbsence && (
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="text"
-                            value={heures.debut}
-                            onChange={(e) => handleTimeChange(
-                              semaineIndex,
-                              jour as keyof JourSemaine,
-                              'debut',
-                              e.target.value
-                            )}
-                            className={`w-24 border rounded p-1 ${
-                              errors[`${semaineIndex}-${jour}`]?.includes('début')
-                                ? 'border-red-500'
-                                : ''
-                            }`}
-                            placeholder="HH:MM"
-                          />
-                          <span>-</span>
-                          <input
-                            type="text"
-                            value={heures.fin}
-                            onChange={(e) => handleTimeChange(
-                              semaineIndex,
-                              jour as keyof JourSemaine,
-                              'fin',
-                              e.target.value
-                            )}
-                            className={`w-24 border rounded p-1 ${
-                              errors[`${semaineIndex}-${jour}`]?.includes('fin')
-                                ? 'border-red-500'
-                                : ''
-                            }`}
-                            placeholder="HH:MM"
-                          />
-                        </div>
+                        <input
+                          type="text"
+                          value={heures.debut}
+                          onChange={(e) => handleTimeChange(
+                            semaineIndex,
+                            jour as keyof JourSemaine,
+                            'debut',
+                            e.target.value
+                          )}
+                          className={`w-24 border rounded p-1 ${
+                            errors[`${semaineIndex}-${jour}`]?.includes('début')
+                              ? 'border-red-500'
+                              : ''
+                          }`}
+                          placeholder="HH:MM"
+                        />
                       )}
                     </td>
                     <td className="border p-2">
                       {!heures.typeAbsence && (
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="text"
-                            value={heures.debutAM}
-                            onChange={(e) => handleTimeChange(
-                              semaineIndex,
-                              jour as keyof JourSemaine,
-                              'debutAM',
-                              e.target.value
-                            )}
-                            className={`w-24 border rounded p-1 ${
-                              errors[`${semaineIndex}-${jour}`]?.includes('début après-midi')
-                                ? 'border-red-500'
-                                : ''
-                            }`}
-                            placeholder="HH:MM"
-                          />
-                          <span>-</span>
-                          <input
-                            type="text"
-                            value={heures.finAM}
-                            onChange={(e) => handleTimeChange(
-                              semaineIndex,
-                              jour as keyof JourSemaine,
-                              'finAM',
-                              e.target.value
-                            )}
-                            className={`w-24 border rounded p-1 ${
-                              errors[`${semaineIndex}-${jour}`]?.includes('fin après-midi')
-                                ? 'border-red-500'
-                                : ''
-                            }`}
-                            placeholder="HH:MM"
-                          />
-                        </div>
+                        <input
+                          type="text"
+                          value={heures.fin}
+                          onChange={(e) => handleTimeChange(
+                            semaineIndex,
+                            jour as keyof JourSemaine,
+                            'fin',
+                            e.target.value
+                          )}
+                          className={`w-24 border rounded p-1 ${
+                            errors[`${semaineIndex}-${jour}`]?.includes('fin matin')
+                              ? 'border-red-500'
+                              : ''
+                          }`}
+                          placeholder="HH:MM"
+                        />
+                      )}
+                    </td>
+                    <td className="border p-2">
+                      {!heures.typeAbsence && (
+                        <input
+                          type="text"
+                          value={heures.debutAM}
+                          onChange={(e) => handleTimeChange(
+                            semaineIndex,
+                            jour as keyof JourSemaine,
+                            'debutAM',
+                            e.target.value
+                          )}
+                          className={`w-24 border rounded p-1 ${
+                            errors[`${semaineIndex}-${jour}`]?.includes('début après-midi')
+                              ? 'border-red-500'
+                              : ''
+                          }`}
+                          placeholder="HH:MM"
+                        />
+                      )}
+                    </td>
+                    <td className="border p-2">
+                      {!heures.typeAbsence && (
+                        <input
+                          type="text"
+                          value={heures.finAM}
+                          onChange={(e) => handleTimeChange(
+                            semaineIndex,
+                            jour as keyof JourSemaine,
+                            'finAM',
+                            e.target.value
+                          )}
+                          className={`w-24 border rounded p-1 ${
+                            errors[`${semaineIndex}-${jour}`]?.includes('fin après-midi')
+                              ? 'border-red-500'
+                              : ''
+                          }`}
+                          placeholder="HH:MM"
+                        />
                       )}
                     </td>
                     <td className="border p-2">
@@ -338,7 +344,7 @@ const CalculateurHeures: React.FC = () => {
                         <option value="MALADIE">Maladie</option>
                       </select>
                     </td>
-                    <td className="border p-2 text-center font-medium">
+                    <td className="border p-2 text-right font-medium">
                       {heures.total}h
                     </td>
                   </tr>
