@@ -1,36 +1,20 @@
-export const isValidTimeFormat = (time: string): boolean => {
+export interface ValidationResult {
+    isValid: boolean;
+    errors: string[];
+  }
+  
+  // Fonction privée, non exportée car utilisée uniquement en interne
+  const isValidTimeFormat = (time: string): boolean => {
     if (!time) return false;
     const regex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
     return regex.test(time);
   };
   
-  export const timeToMinutes = (time: string): number => {
+  const timeToMinutes = (time: string): number => {
     if (!isValidTimeFormat(time)) return 0;
     const [hours, minutes] = time.split(':').map(Number);
     return hours * 60 + minutes;
   };
-  
-  export const minutesToTime = (minutes: number): string => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-  };
-  
-  export const calculateDuration = (start: string, end: string): number => {
-    if (!isValidTimeFormat(start) || !isValidTimeFormat(end)) return 0;
-    
-    const startMinutes = timeToMinutes(start);
-    const endMinutes = timeToMinutes(end);
-    
-    if (endMinutes <= startMinutes) return 0;
-    
-    return (endMinutes - startMinutes) / 60;
-  };
-  
-  export interface ValidationResult {
-    isValid: boolean;
-    errors: string[];
-  }
   
   export const validateDayTimes = (
     debut: string,
@@ -85,8 +69,9 @@ export const isValidTimeFormat = (time: string): boolean => {
     const validation = validateDayTimes(debut, fin, debutAM, finAM);
     if (!validation.isValid) return 0;
     
-    const matinDuration = calculateDuration(debut, fin);
-    const pmDuration = calculateDuration(debutAM, finAM);
+    const dureeMatinMinutes = timeToMinutes(fin) - timeToMinutes(debut);
+    const dureeAMMinutes = timeToMinutes(finAM) - timeToMinutes(debutAM);
     
-    return Math.round((matinDuration + pmDuration) * 100) / 100;
+    const totalHeures = (dureeMatinMinutes + dureeAMMinutes) / 60;
+    return Math.round(totalHeures * 100) / 100;
   };

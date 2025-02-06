@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { HeuresJour, JourSemaine, Employe, Semaine, Resultats } from './types';
 import { calculerSemaine } from './utils';
-import { calculateDayTotal, validateDayTimes, isValidTimeFormat } from './timeUtils';
+import { calculateDayTotal, validateDayTimes } from './timeUtils';
 import { exportToExcel } from './excelExport';
 
 const defaultHeuresJour: HeuresJour = {
