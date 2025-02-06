@@ -1,48 +1,23 @@
-import { HeuresJour, Resultats } from './types';
+// constants.ts
+export const HEURES_PAR_JOUR = 7;
+export const SEUIL_SEMAINE = 35;
+export const SEUIL_HS_25 = 35;
+export const SEUIL_HS_50 = 43;
 
-export const defaultHours: Record<string, HeuresJour> = {
-  lundi: {
-    debut: '8:00',
-    fin: '12:00',
-    debutAM: '13:30',
-    finAM: '17:30',
-    total: 8,
-  },
-  mardi: {
-    debut: '8:00',
-    fin: '12:00',
-    debutAM: '13:30',
-    finAM: '17:30',
-    total: 8,
-  },
-  mercredi: {
-    debut: '8:00',
-    fin: '12:00',
-    debutAM: '13:30',
-    finAM: '17:30',
-    total: 8,
-  },
-  jeudi: {
-    debut: '8:00',
-    fin: '12:00',
-    debutAM: '13:30',
-    finAM: '17:30',
-    total: 8,
-  },
-  vendredi: {
-    debut: '8:00',
-    fin: '12:00',
-    debutAM: '13:30',
-    finAM: '17:30',
-    total: 8,
-  },
+export const defaultHours = {
+  lundi: { debut: '8:00', fin: '12:00', debutAM: '13:30', finAM: '17:30', total: 7, typeAbsence: null },
+  mardi: { debut: '8:00', fin: '12:00', debutAM: '13:30', finAM: '17:30', total: 7, typeAbsence: null },
+  mercredi: { debut: '8:00', fin: '12:00', debutAM: '13:30', finAM: '17:30', total: 7, typeAbsence: null },
+  jeudi: { debut: '8:00', fin: '12:00', debutAM: '13:30', finAM: '17:30', total: 7, typeAbsence: null },
+  vendredi: { debut: '8:00', fin: '12:00', debutAM: '13:30', finAM: '17:30', total: 7, typeAbsence: null }
 };
 
-export const defaultResults: Resultats = {
-  totalReel: 40,
-  heuresEffectives: 40,
-  hn: 0,
-  hs25: 0,
-  hs50: 0,
-  totalFinal: 0,
+export const defaultResults = {
+  totalReel: 35,
+  heuresEffectives: 35,
+  heuresDiverses: 0,
+  heuresSupp25: 0,
+  heuresSupp50: 0,
+  seuil: 35,
+  totalFinal: 0
 };

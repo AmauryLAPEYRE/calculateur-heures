@@ -1,125 +1,56 @@
-import React, { useState, ChangeEvent } from 'react';
-import * as XLSX from 'xlsx';
-import { HeuresJour, Employe, Semaine, JourSemaine, Resultats } from './types';
-import { getWeekNumber, calculerDuree } from './utils';
+import React, { useState } from 'react';
+import { HeuresJour, JourSemaine, Employe, Semaine, Resultats } from './types';
+import { calculerSemaine } from './utils';
+import { calculateDayTotal, validateDayTimes, isValidTimeFormat } from './timeUtils';
+import { exportToExcel } from './excelExport';
 
-const defaultHours: JourSemaine = {
-  lundi: { debut: '8:00', fin: '12:00', debutAM: '13:30', finAM: '17:30', total: 8 },
-  mardi: { debut: '8:00', fin: '12:00', debutAM: '13:30', finAM: '17:30', total: 8 },
-  mercredi: { debut: '8:00', fin: '12:00', debutAM: '13:30', finAM: '17:30', total: 8 },
-  jeudi: { debut: '8:00', fin: '12:00', debutAM: '13:30', finAM: '17:30', total: 8 },
-  vendredi: { debut: '8:00', fin: '12:00', debutAM: '13:30', finAM: '17:30', total: 8 }
+const defaultHeuresJour: HeuresJour = {
+  debut: '',
+  fin: '',
+  debutAM: '',
+  finAM: '',
+  total: 0,
+  typeAbsence: null
 };
 
-const defaultResults: Resultats = {
-  totalReel: 40,
-  heuresEffectives: 40,
-  hn: 0,
-  hs25: 0,
-  hs50: 0,
-  totalFinal: 0
+const defaultResultats: Resultats = {
+  totalReel: 0,
+  heuresEffectives: 0,
+  heuresRegulieresNormales: 0,
+  heuresDiverses: 0,
+  heuresSupp25: 0,
+  heuresSupp50: 0,
+  seuil: 35,
+  totalFinal: 0,
+  joursPaies: 0,
+  joursExclus: 0,
+  detailCalculSeuil: ''
+};
+
+const defaultJourSemaine: JourSemaine = {
+  lundi: { ...defaultHeuresJour },
+  mardi: { ...defaultHeuresJour },
+  mercredi: { ...defaultHeuresJour },
+  jeudi: { ...defaultHeuresJour },
+  vendredi: { ...defaultHeuresJour }
 };
 
 const CalculateurHeures: React.FC = () => {
-  const [baseContrat, setBaseContrat] = useState<string>('36.67');
   const [employe, setEmploye] = useState<Employe>({
     nom: '',
     prenom: ''
   });
+
   const [semaines, setSemaines] = useState<Semaine[]>([{
-    heures: defaultHours,
+    heures: defaultJourSemaine,
     periode: '',
     dates: '',
-    resultats: defaultResults
+    resultats: defaultResultats
   }]);
 
-  const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const [errors, setErrors] = useState<Record<string, string[]>>({});
 
-    try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-
-      const nouvellesSemaines = (jsonData as any[]).slice(1).flatMap(row => {
-        if (!row || row.length < 2) return [];
-
-        return Array(4).fill(null).map(() => ({
-          heures: {...defaultHours},
-          periode: String(row[0] || ''),
-          dates: String(row[1] || ''),
-          resultats: {...defaultResults}
-        }));
-      });
-
-      setSemaines(nouvellesSemaines);
-    } catch (error) {
-      console.error('Erreur lors de la lecture du fichier:', error);
-    }
-  };
-
-  const exportToExcel = () => {
-    if (!employe.nom || !employe.prenom) {
-      alert('Veuillez renseigner le nom et le prénom');
-      return;
-    }
-
-    try {
-      const exportData: any[][] = [
-        ['Fiche de temps'],
-        [],
-        ['Nom:', employe.nom],
-        ['Prénom:', employe.prenom],
-        ['Base contrat:', baseContrat],
-        []
-      ];
-
-      semaines.forEach((semaine) => {
-        if (!semaine.dates) return;
-
-        exportData.push([
-          `Semaine ${getWeekNumber(semaine.dates.split(' au ')[0])} - ${semaine.dates}`
-        ]);
-
-        exportData.push(['Jour', 'Début Matin', 'Fin Matin', 'Début Après-midi', 'Fin Après-midi', 'Total']);
-
-        Object.entries(semaine.heures).forEach(([jour, heures]) => {
-          exportData.push([
-            jour,
-            heures.debut,
-            heures.fin,
-            heures.debutAM,
-            heures.finAM,
-            heures.total
-          ]);
-        });
-
-        exportData.push([]);
-        exportData.push(['Récapitulatif:']);
-        exportData.push(['Heures réelles', semaine.resultats.totalReel]);
-        exportData.push(['Heures effectives', semaine.resultats.heuresEffectives]);
-        exportData.push(['Heures normales (HN)', semaine.resultats.hn]);
-        exportData.push(['Heures sup. 25%', semaine.resultats.hs25]);
-        exportData.push(['Heures sup. 50%', semaine.resultats.hs50]);
-        exportData.push(['Total final', semaine.resultats.totalFinal]);
-        exportData.push([]);
-      });
-
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet(exportData);
-
-      XLSX.utils.book_append_sheet(wb, ws, "Heures travaillées");
-      XLSX.writeFile(wb, `${employe.nom}_${employe.prenom}_heures.xlsx`);
-
-    } catch (error) {
-      console.error('Erreur lors de l\'export Excel:', error);
-      alert('Une erreur est survenue lors de l\'export Excel');
-    }
-  };
-
-  const handleHeureChange = (
+  const handleTimeChange = (
     semaineIndex: number,
     jour: keyof JourSemaine,
     champ: keyof HeuresJour,
@@ -129,258 +60,395 @@ const CalculateurHeures: React.FC = () => {
       const newSemaines = [...prev];
       const semaine = {...newSemaines[semaineIndex]};
       
-      if (valeur === 'CP' || valeur === 'ABS') {
+      // Nettoyer les erreurs existantes pour ce jour
+      const newErrors = {...errors};
+      delete newErrors[`${semaineIndex}-${jour}`];
+      setErrors(newErrors);
+
+      if (['CP', 'RTT', 'MALADIE'].includes(valeur)) {
         semaine.heures[jour] = {
-          debut: valeur,
+          debut: '',
           fin: '',
           debutAM: '',
           finAM: '',
-          total: 0
+          total: 0,
+          typeAbsence: valeur as 'CP' | 'RTT' | 'MALADIE'
         };
       } else {
         semaine.heures[jour] = {
           ...semaine.heures[jour],
-          [champ]: valeur
+          [champ]: valeur,
+          typeAbsence: null
         };
 
-        if (semaine.heures[jour].debut && semaine.heures[jour].fin && 
-            semaine.heures[jour].debutAM && semaine.heures[jour].finAM) {
-          const matin = calculerDuree(semaine.heures[jour].debut, semaine.heures[jour].fin);
-          const apresMidi = calculerDuree(semaine.heures[jour].debutAM, semaine.heures[jour].finAM);
-          semaine.heures[jour].total = Math.round((matin + apresMidi) * 100) / 100;
-        }
-      }
-
-      let totalReel = 0;
-      let heuresEffectives = 0;
-      let absences = 0;
-      let congesPayes = 0;
-
-      Object.values(semaine.heures).forEach(jour => {
-        if (jour.debut === 'ABS') {
-          absences++;
-          heuresEffectives += 7;
-        } else if (jour.debut === 'CP') {
-          congesPayes++;
-          heuresEffectives += 7;
-        } else {
-          totalReel += jour.total;
-          heuresEffectives += jour.total;
-        }
-      });
-
-      const baseContratNum = parseFloat(baseContrat);
-      let hn = 0;
-      let hs25 = 0;
-      let hs50 = 0;
-
-      const totalAbsences = (absences + congesPayes) * 7;
-      const diffHeuresBaseContrat = heuresEffectives - baseContratNum;
-
-      if (absences > 0 || congesPayes > 0) {
-        if (totalReel <= baseContratNum) {
-          const maxHN = Math.min(totalAbsences, Math.max(0, diffHeuresBaseContrat));
-          hn = maxHN;
-          
-          const heuresSupp = diffHeuresBaseContrat - maxHN;
-          if (heuresSupp > 0) {
-            if (heuresEffectives <= 44) {
-              hs25 = heuresSupp;
+        const { debut, fin, debutAM, finAM } = semaine.heures[jour];
+        
+        // Valider le format et calculer le total si nécessaire
+        if (champ === 'debut' || champ === 'fin' || champ === 'debutAM' || champ === 'finAM') {
+          if (debut && fin && debutAM && finAM) {
+            const validation = validateDayTimes(debut, fin, debutAM, finAM);
+            
+            if (!validation.isValid) {
+              setErrors(prev => ({
+                ...prev,
+                [`${semaineIndex}-${jour}`]: validation.errors
+              }));
             } else {
-              hs25 = 44 - baseContratNum;
-              hs50 = heuresEffectives - 44;
+              semaine.heures[jour].total = calculateDayTotal(debut, fin, debutAM, finAM);
             }
           }
-        } else {
-          if (heuresEffectives <= 44) {
-            hs25 = heuresEffectives - baseContratNum;
-          } else {
-            hs25 = 44 - baseContratNum;
-            hs50 = heuresEffectives - 44;
-          }
-        }
-      } else if (heuresEffectives > baseContratNum) {
-        if (heuresEffectives <= 44) {
-          hs25 = heuresEffectives - baseContratNum;
-        } else {
-          hs25 = 44 - baseContratNum;
-          hs50 = heuresEffectives - 44;
         }
       }
 
-      semaine.resultats = {
-        totalReel: Math.round(totalReel * 100) / 100,
-        heuresEffectives: Math.round(heuresEffectives * 100) / 100,
-        hn: Math.round(Math.max(0, hn) * 100) / 100,
-        hs25: Math.round(Math.max(0, hs25) * 100) / 100,
-        hs50: Math.round(Math.max(0, hs50) * 100) / 100,
-        totalFinal: Math.round(Math.max(0, hn + hs25 + hs50) * 100) / 100
-      };
-
+      // Recalculer les résultats de la semaine
+      semaine.resultats = calculerSemaine(semaine.heures);
       newSemaines[semaineIndex] = semaine;
       return newSemaines;
     });
   };
 
+  const handleEmployeChange = (field: keyof Employe) => (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setEmploye(prev => ({
+      ...prev,
+      [field]: e.target.value
+    }));
+  };
+
+  const handleDateChange = (semaineIndex: number, value: string) => {
+    setSemaines(prev => {
+      const newSemaines = [...prev];
+      newSemaines[semaineIndex].dates = value;
+      return newSemaines;
+    });
+  };
+
+  const ajouterSemaine = () => {
+    setSemaines(prev => [
+      ...prev,
+      {
+        heures: defaultJourSemaine,
+        periode: '',
+        dates: '',
+        resultats: defaultResultats
+      }
+    ]);
+  };
+
+  const supprimerSemaine = (index: number) => {
+    setSemaines(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleExport = () => {
+    if (!employe.nom || !employe.prenom) {
+      alert('Veuillez renseigner le nom et le prénom avant d\'exporter');
+      return;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      alert('Veuillez corriger les erreurs avant d\'exporter');
+      return;
+    }
+
+    try {
+      exportToExcel(semaines, employe);
+    } catch (error) {
+      console.error('Erreur lors de l\'export:', error);
+      alert('Une erreur est survenue lors de l\'export');
+    }
+  };
+
   return (
-    <div className="w-full max-w-4xl mx-auto p-4">
-      <div className="mb-6">
-        <div className="bg-gray-100 p-4 rounded-lg">
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block text-sm font-medium mb-1">Nom</label>
-              <input
-                type="text"
-                value={employe.nom}
-                onChange={(e) => setEmploye(prev => ({...prev, nom: e.target.value}))}
-                className="w-full p-2 border rounded"
-                placeholder="Nom"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Prénom</label>
-              <input
-                type="text"
-                value={employe.prenom}
-                onChange={(e) => setEmploye(prev => ({...prev, prenom: e.target.value}))}
-                className="w-full p-2 border rounded"
-                placeholder="Prénom"
-              />
-            </div>
+    <div className="max-w-6xl mx-auto p-4">
+      <div className="mb-6 bg-white rounded-lg shadow-md p-4">
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nom
+            </label>
+            <input
+              type="text"
+              value={employe.nom}
+              onChange={handleEmployeChange('nom')}
+              className="w-full border rounded p-2"
+              placeholder="Nom de l'employé"
+            />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Prénom
+            </label>
+            <input
+              type="text"
+              value={employe.prenom}
+              onChange={handleEmployeChange('prenom')}
+              className="w-full border rounded p-2"
+              placeholder="Prénom de l'employé"
+            />
+          </div>
+        </div>
 
-          <div className="flex gap-4 mb-6">
-            <div>
-              <label className="block text-sm font-medium mb-1">Base contrat (h.mm)</label>
-              <input
-                type="text"
-                value={baseContrat}
-                onChange={(e) => setBaseContrat(e.target.value)}
-                className="w-24 p-2 border rounded"
-                placeholder="36.67"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-sm font-medium mb-1">Import Excel</label>
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileUpload}
-                className="w-full p-2 border rounded"
-              />
-            </div>
-          </div>
-
-          <div className="text-sm text-gray-600 mb-4">
-            <div>Pour les congés payés, écrivez "CP"</div>
-            <div>Pour les absences, écrivez "ABS"</div>
-          </div>
-
-          <div className="flex justify-end">
-            <button
-              onClick={exportToExcel}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={!employe.nom || !employe.prenom}
-            >
-              Exporter en Excel
-            </button>
-          </div>
+        <div className="flex justify-between items-center">
+          <button
+            onClick={ajouterSemaine}
+            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+          >
+            + Ajouter une semaine
+          </button>
+          
+          <button
+            onClick={handleExport}
+            disabled={!employe.nom || !employe.prenom || Object.keys(errors).length > 0}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+          >
+            Exporter en Excel
+          </button>
         </div>
       </div>
 
       {semaines.map((semaine, semaineIndex) => (
-        <div key={semaineIndex} className="mb-8 border rounded-lg shadow-sm">
-          <div className="bg-gray-100 p-3 rounded-t-lg">
-            <h3 className="font-semibold">
-              {semaine.dates} - Semaine {
-                semaine.dates ? getWeekNumber(semaine.dates.split(' au ')[0]) : ''
-              }
-            </h3>
+        <div key={semaineIndex} className="mb-8 bg-white rounded-lg shadow-md">
+          <div className="p-4 border-b bg-gray-50">
+            <div className="flex justify-between items-center">
+              <input
+                type="text"
+                value={semaine.dates}
+                onChange={(e) => handleDateChange(semaineIndex, e.target.value)}
+                placeholder="Dates de la semaine (ex: 01/01 au 05/01)"
+                className="border rounded p-2"
+              />
+              
+              <button
+                onClick={() => supprimerSemaine(semaineIndex)}
+                className="text-red-500 hover:text-red-700"
+              >
+                Supprimer
+              </button>
+            </div>
           </div>
 
           <div className="p-4">
-            <table className="w-full border-collapse border border-gray-300 mb-4">
+            <table className="w-full border-collapse mb-4">
               <thead>
                 <tr className="bg-gray-50">
                   <th className="border p-2">Jour</th>
                   <th className="border p-2">Matin</th>
                   <th className="border p-2">Après-midi</th>
+                  <th className="border p-2">Type Absence</th>
                   <th className="border p-2">Total</th>
                 </tr>
               </thead>
               <tbody>
-                {(Object.entries(semaine.heures) as [keyof JourSemaine, HeuresJour][]).map(([jour, heures]) => (
+                {Object.entries(semaine.heures).map(([jour, heures]) => (
                   <tr key={jour}>
                     <td className="border p-2 font-medium capitalize">{jour}</td>
                     <td className="border p-2">
-                      {heures.debut === 'ABS' || heures.debut === 'CP' ? (
-                        <input
-                          type="text"
-                          value={heures.debut}
-                          onChange={(e) => handleHeureChange(semaineIndex, jour, 'debut', e.target.value)}
-                          className="w-20 p-1 border rounded text-center"
-                        />
-                      ) : (
-                        <>
+                      {!heures.typeAbsence && (
+                        <div className="flex items-center space-x-2">
                           <input
                             type="text"
                             value={heures.debut}
-                            onChange={(e) => handleHeureChange(semaineIndex, jour, 'debut', e.target.value)}
-                            className="w-20 p-1 border rounded text-center"
+                            onChange={(e) => handleTimeChange(
+                              semaineIndex,
+                              jour as keyof JourSemaine,
+                              'debut',
+                              e.target.value
+                            )}
+                            className={`w-24 border rounded p-1 ${
+                              errors[`${semaineIndex}-${jour}`]?.includes('début')
+                                ? 'border-red-500'
+                                : ''
+                            }`}
+                            placeholder="HH:MM"
                           />
-                          <span className="px-2">à</span>
+                          <span>-</span>
                           <input
                             type="text"
                             value={heures.fin}
-                            onChange={(e) => handleHeureChange(semaineIndex, jour, 'fin', e.target.value)}
-                            className="w-20 p-1 border rounded text-center"
+                            onChange={(e) => handleTimeChange(
+                              semaineIndex,
+                              jour as keyof JourSemaine,
+                              'fin',
+                              e.target.value
+                            )}
+                            className={`w-24 border rounded p-1 ${
+                              errors[`${semaineIndex}-${jour}`]?.includes('fin')
+                                ? 'border-red-500'
+                                : ''
+                            }`}
+                            placeholder="HH:MM"
                           />
-                        </>
+                        </div>
                       )}
                     </td>
                     <td className="border p-2">
-                      {heures.debut !== 'CP' && heures.debut !== 'ABS' && (
-                        <><input
-                        type="text"
-                        value={heures.debutAM}
-                        onChange={(e) => handleHeureChange(semaineIndex, jour, 'debutAM', e.target.value)}
-                        className="w-20 p-1 border rounded text-center"
-                      />
-                      <span className="px-2">à</span>
-                      <input
-                        type="text"
-                        value={heures.finAM}
-                        onChange={(e) => handleHeureChange(semaineIndex, jour, 'finAM', e.target.value)}
-                        className="w-20 p-1 border rounded text-center"
-                      />
-                    </>
-                  )}
-                </td>
-                <td className="border p-2 text-center font-medium">
-                  {heures.total}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                      {!heures.typeAbsence && (
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="text"
+                            value={heures.debutAM}
+                            onChange={(e) => handleTimeChange(
+                              semaineIndex,
+                              jour as keyof JourSemaine,
+                              'debutAM',
+                              e.target.value
+                            )}
+                            className={`w-24 border rounded p-1 ${
+                              errors[`${semaineIndex}-${jour}`]?.includes('début après-midi')
+                                ? 'border-red-500'
+                                : ''
+                            }`}
+                            placeholder="HH:MM"
+                          />
+                          <span>-</span>
+                          <input
+                            type="text"
+                            value={heures.finAM}
+                            onChange={(e) => handleTimeChange(
+                              semaineIndex,
+                              jour as keyof JourSemaine,
+                              'finAM',
+                              e.target.value
+                            )}
+                            className={`w-24 border rounded p-1 ${
+                              errors[`${semaineIndex}-${jour}`]?.includes('fin après-midi')
+                                ? 'border-red-500'
+                                : ''
+                            }`}
+                            placeholder="HH:MM"
+                          />
+                        </div>
+                      )}
+                    </td>
+                    <td className="border p-2">
+                      <select
+                        value={heures.typeAbsence || ''}
+                        onChange={(e) => handleTimeChange(
+                          semaineIndex,
+                          jour as keyof JourSemaine,
+                          'typeAbsence',
+                          e.target.value
+                        )}
+                        className="w-full border rounded p-1"
+                      >
+                        <option value="">Aucune absence</option>
+                        <option value="CP">Congés payés</option>
+                        <option value="RTT">RTT</option>
+                        <option value="MALADIE">Maladie</option>
+                      </select>
+                    </td>
+                    <td className="border p-2 text-center font-medium">
+                      {heures.total}h
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-        <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded">
+            {/* Affichage des erreurs */}
+            {Object.entries(errors)
+              .filter(([key]) => key.startsWith(`${semaineIndex}-`))
+              .map(([key, errorMessages]) => (
+                <div key={key} className="text-red-500 text-sm mb-2">
+                  {errorMessages.map((message, idx) => (
+                    <div key={idx}>{message}</div>
+                  ))}
+                </div>
+              ))}
+
+            {/* Résumé des calculs */}
+            <div className="grid grid-cols-2 gap-4 mt-4 bg-gray-50 p-4 rounded">
+              <div>
+                <h3 className="font-bold mb-2">Détail du calcul</h3>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Seuil hebdomadaire:</span>
+                    <span>{semaine.resultats.seuil}h</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Heures régulières:</span>
+                    <span>{semaine.resultats.heuresRegulieresNormales}h</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Heures diverses:</span>
+                    <span>{semaine.resultats.heuresDiverses}h</span>
+                  </div>
+                  <div className="flex justify-between text-orange-600">
+                    <span>Heures sup. 25%:</span>
+                    <span>{semaine.resultats.heuresSupp25}h</span>
+                  </div>
+                  <div className="flex justify-between text-red-600">
+                    <span>Heures sup. 50%:</span>
+                    <span>{semaine.resultats.heuresSupp50}h</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="font-bold mb-2">Totaux</h3>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Total heures réelles:</span>
+                    <span>{semaine.resultats.totalReel}h</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Total heures effectives:</span>
+                    <span>{semaine.resultats.heuresEffectives}h</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-blue-600">
+                    <span>Total final:</span>
+                    <span>{semaine.resultats.totalFinal}h</span>
+                  </div>
+                  <div className="pt-2 mt-2 border-t">
+                    <div className="flex justify-between">
+                      <span>Jours payés (CP/RTT):</span>
+                      <span>{semaine.resultats.joursPaies}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Jours exclus (Maladie):</span>
+                      <span>{semaine.resultats.joursExclus}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Détail du calcul du seuil */}
+            <div className="mt-4 bg-gray-50 p-4 rounded">
+              <h3 className="font-bold mb-2">Détail du calcul du seuil</h3>
+              <div className="whitespace-pre-line text-sm">
+                {semaine.resultats.detailCalculSeuil}
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* Légende et aide */}
+      <div className="mt-8 bg-white rounded-lg shadow-md p-4">
+        <h3 className="font-bold mb-2">Aide et légende</h3>
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <div className="font-medium">Heures réelles: {semaine.resultats.totalReel}</div>
-            <div className="font-medium">Heures effectives: {semaine.resultats.heuresEffectives}</div>
+            <h4 className="font-medium mb-1">Format des heures</h4>
+            <ul className="text-sm space-y-1">
+              <li>• Utilisez le format HH:MM (ex: 09:00)</li>
+              <li>• La pause déjeuner est obligatoire (minimum 45min)</li>
+              <li>• Les heures sont calculées automatiquement</li>
+            </ul>
           </div>
           <div>
-            <div className="font-medium">HN: {semaine.resultats.hn}</div>
-            <div className="font-medium">HS 25%: {semaine.resultats.hs25}</div>
-            <div className="font-medium">HS 50%: {semaine.resultats.hs50}</div>
-            <div className="font-medium mt-2">Total: {semaine.resultats.totalFinal}</div>
+            <h4 className="font-medium mb-1">Types d'absence</h4>
+            <ul className="text-sm space-y-1">
+              <li>• CP : Congés payés (comptés dans heures effectives)</li>
+              <li>• RTT : Réduction du temps de travail (comptés dans heures effectives)</li>
+              <li>• Maladie : Arrêt maladie (exclus du calcul)</li>
+            </ul>
           </div>
         </div>
       </div>
     </div>
-  ))}
-</div>
-);
+  );
 };
 
 export default CalculateurHeures;

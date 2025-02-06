@@ -1,9 +1,16 @@
+// types.ts
+export interface Employe {
+  nom: string;
+  prenom: string;
+}
+
 export interface HeuresJour {
   debut: string;
   fin: string;
   debutAM: string;
   finAM: string;
   total: number;
+  typeAbsence: 'CP' | 'RTT' | 'MALADIE' | null;
 }
 
 export interface JourSemaine {
@@ -17,10 +24,15 @@ export interface JourSemaine {
 export interface Resultats {
   totalReel: number;
   heuresEffectives: number;
-  hn: number;
-  hs25: number;
-  hs50: number;
+  heuresRegulieresNormales: number;
+  heuresDiverses: number;
+  heuresSupp25: number;
+  heuresSupp50: number;
+  seuil: number;
   totalFinal: number;
+  joursPaies: number;
+  joursExclus: number;
+  detailCalculSeuil: string;
 }
 
 export interface Semaine {
@@ -29,10 +41,3 @@ export interface Semaine {
   dates: string;
   resultats: Resultats;
 }
-
-export interface Employe {
-  nom: string;
-  prenom: string;
-}
-
-export type WeekTitle = string;
