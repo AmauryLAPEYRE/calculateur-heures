@@ -1,4 +1,4 @@
-import { HeuresJour, JourSemaine, Resultats, TypeAbsence } from './types';
+import { JourSemaine, Resultats, TypeAbsence } from './types';
 
 export const HEURES_PAR_JOUR = 7;
 export const SEUIL_SEMAINE = 35;
