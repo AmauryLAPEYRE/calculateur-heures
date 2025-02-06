@@ -1,12 +1,25 @@
 import * as XLSX from 'xlsx';
 import { Semaine, Employe } from './types';
 
+interface WorksheetStyle {
+  font?: {
+    bold?: boolean;
+    color?: { rgb: string };
+  };
+  fill?: {
+    fgColor: { rgb: string };
+  };
+  alignment?: {
+    horizontal?: 'center' | 'left' | 'right';
+  };
+}
+
 interface ExcelStyles {
-  header: XLSX.CellStyle;
-  subheader: XLSX.CellStyle;
-  normal: XLSX.CellStyle;
-  total: XLSX.CellStyle;
-  formula: XLSX.CellStyle;
+  header: WorksheetStyle;
+  subheader: WorksheetStyle;
+  normal: WorksheetStyle;
+  total: WorksheetStyle;
+  formula: WorksheetStyle;
 }
 
 const styles: ExcelStyles = {
@@ -39,7 +52,7 @@ export const exportToExcel = (
   const workbook = XLSX.utils.book_new();
   
   semaines.forEach((semaine, index) => {
-    const ws = XLSX.utils.aoa_to_sheet([['']]);  // Start with empty sheet
+    const ws = XLSX.utils.aoa_to_sheet([['']]);
     
     // En-tête
     XLSX.utils.sheet_add_aoa(ws, [
@@ -78,10 +91,9 @@ export const exportToExcel = (
     });
 
     // Calculs
-    const lastRow = startRow + 5;  // Après les 5 jours
+    const lastRow = startRow + 5;
     const calculRow = lastRow + 2;
 
-    // Formules de calcul
     XLSX.utils.sheet_add_aoa(ws, [
       ['Calculs'],
       ['Jours payés (CP/RTT):', { f: `COUNTIF(F${startRow + 1}:F${lastRow},"CP")+COUNTIF(F${startRow + 1}:F${lastRow},"RTT")` }],
@@ -100,7 +112,7 @@ export const exportToExcel = (
     ], { origin: `A${calculRow}` });
 
     // Ajuster les largeurs de colonnes
-    const cols = [
+    ws['!cols'] = [
       { wch: 15 }, // A
       { wch: 12 }, // B
       { wch: 12 }, // C
@@ -109,7 +121,6 @@ export const exportToExcel = (
       { wch: 15 }, // F
       { wch: 12 }  // G
     ];
-    ws['!cols'] = cols;
 
     // Appliquer les styles
     applyStyles(ws);
@@ -117,13 +128,14 @@ export const exportToExcel = (
     XLSX.utils.book_append_sheet(workbook, ws, `Semaine ${index + 1}`);
   });
   
-  // Générer le fichier
   const filename = `${employe.nom}_${employe.prenom}_heures.xlsx`;
   XLSX.writeFile(workbook, filename);
 };
 
 const applyStyles = (worksheet: XLSX.WorkSheet): void => {
-  const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+  if (!worksheet['!ref']) return;
+  
+  const range = XLSX.utils.decode_range(worksheet['!ref']);
   
   for (let row = range.s.r; row <= range.e.r; row++) {
     for (let col = range.s.c; col <= range.e.c; col++) {
@@ -131,24 +143,20 @@ const applyStyles = (worksheet: XLSX.WorkSheet): void => {
       const cell = worksheet[cellAddress];
       
       if (cell) {
-        // Style par défaut
-        cell.s = { ...styles.normal };
+        cell.s = { ...styles.normal } as any;
         
-        // Styles spéciaux
         if (row === 0) {
-          cell.s = { ...styles.header };
+          cell.s = { ...styles.header } as any;
         } else if (cell.f) {
-          cell.s = { ...styles.formula };
+          cell.s = { ...styles.formula } as any;
         }
 
-        // Entêtes de sections
         if (cell.v === 'Paramètres' || cell.v === 'Calculs') {
-          cell.s = { ...styles.subheader };
+          cell.s = { ...styles.subheader } as any;
         }
 
-        // Totaux
         if (typeof cell.v === 'string' && cell.v.includes('Total')) {
-          cell.s = { ...styles.total };
+          cell.s = { ...styles.total } as any;
         }
       }
     }

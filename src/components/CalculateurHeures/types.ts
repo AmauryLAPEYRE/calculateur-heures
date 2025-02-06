@@ -1,8 +1,4 @@
-// types.ts
-export interface Employe {
-  nom: string;
-  prenom: string;
-}
+export type TypeAbsence = 'CP' | 'RTT' | 'MALADIE' | null;
 
 export interface HeuresJour {
   debut: string;
@@ -10,7 +6,7 @@ export interface HeuresJour {
   debutAM: string;
   finAM: string;
   total: number;
-  typeAbsence: 'CP' | 'RTT' | 'MALADIE' | null;
+  typeAbsence: TypeAbsence;
 }
 
 export interface JourSemaine {
@@ -40,4 +36,9 @@ export interface Semaine {
   periode: string;
   dates: string;
   resultats: Resultats;
+}
+
+export interface Employe {
+  nom: string;
+  prenom: string;
 }
