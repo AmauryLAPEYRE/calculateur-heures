@@ -1,4 +1,3 @@
-// utils.ts
 import { HeuresJour, JourSemaine, Resultats, TypeAbsence } from './types';
 
 export const HEURES_PAR_JOUR = 7;
@@ -6,22 +5,20 @@ export const SEUIL_SEMAINE = 35;
 export const SEUIL_HS_25 = 35;
 export const SEUIL_HS_50 = 43;
 
-// Vérifie si une absence doit être exclue du calcul des heures supplémentaires
-function isAbsenceExclue(typeAbsence: TypeAbsence): boolean {
-  return typeAbsence === 'CP' || typeAbsence === 'RTT' || typeAbsence === 'MALADIE';
-}
-
-// Vérifie si une absence est payée
-function isAbsencePayee(typeAbsence: TypeAbsence): boolean {
+const isAbsencePayee = (typeAbsence: TypeAbsence): boolean => {
   return typeAbsence === 'CP' || typeAbsence === 'RTT';
-}
+};
+
+const isAbsenceExclue = (typeAbsence: TypeAbsence): boolean => {
+  return typeAbsence === 'CP' || typeAbsence === 'RTT' || typeAbsence === 'MALADIE';
+};
 
 export const calculerSemaine = (heures: JourSemaine): Resultats => {
   let totalReel = 0;
   let heuresEffectives = 0;
   let joursPaies = 0;
   let joursExclus = 0;
-  let detailCalculSeuil = 'Calcul du seuil : ';
+  let detailCalculSeuil = 'Calcul du seuil : \n';
 
   // 1. Analyser chaque jour
   Object.entries(heures).forEach(([jour, donnees]) => {
@@ -29,15 +26,15 @@ export const calculerSemaine = (heures: JourSemaine): Resultats => {
       if (isAbsencePayee(donnees.typeAbsence)) {
         joursPaies++;
         heuresEffectives += HEURES_PAR_JOUR;
-        detailCalculSeuil += `\n- ${jour}: Jour ${donnees.typeAbsence} (exclu, mais payé)`;
+        detailCalculSeuil += `- ${jour}: Jour ${donnees.typeAbsence} (exclu, mais payé)\n`;
       } else {
         joursExclus++;
-        detailCalculSeuil += `\n- ${jour}: ${donnees.typeAbsence} (exclu, non payé)`;
+        detailCalculSeuil += `- ${jour}: ${donnees.typeAbsence} (exclu, non payé)\n`;
       }
     } else {
       totalReel += donnees.total;
       heuresEffectives += donnees.total;
-      detailCalculSeuil += `\n- ${jour}: Travaillé (${donnees.total}h)`;
+      detailCalculSeuil += `- ${jour}: Travaillé (${donnees.total}h)\n`;
     }
   });
 
